@@ -19,6 +19,7 @@ const dbConfig = {
     encrypt: process.env.DB_ENCRYPT === 'true',
     trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE !== 'false',
   },
+  requestTimeout: 60000,
   pool: {
     max: 10,
     min: 0,
@@ -91,43 +92,42 @@ app.get('/api/analytics/counts', async (req, res) => {
     const { gov_serial, authority_serial } = req.query;
     const p = await getPool();
 
-    // Build governorate-level aggregation
+    // Governorate breakdown using pre-aggregated subqueries to avoid cartesian product
     const request = p.request();
-    const govFilter = [];
-    if (gov_serial) {
-      request.input('gov_serial', sql.Int, parseInt(gov_serial, 10));
-      govFilter.push('v.gov_serial = @gov_serial');
-      govFilter.push('u.gov_serial = @gov_serial');
-      govFilter.push('m.gov_serial = @gov_serial');
-    }
-    if (authority_serial) {
-      request.input('authority_serial', sql.Int, parseInt(authority_serial, 10));
-      govFilter.push('v.authority_serial = @authority_serial');
-      govFilter.push('u.authority_serial = @authority_serial');
-      govFilter.push('m.authority_serial = @authority_serial');
-    }
+    if (gov_serial) request.input('gov_serial', sql.Int, parseInt(gov_serial, 10));
+    if (authority_serial) request.input('authority_serial', sql.Int, parseInt(authority_serial, 10));
 
-    // Governorate breakdown
+    const vFilterParts = [gov_serial && 'gov_serial = @gov_serial', authority_serial && 'authority_serial = @authority_serial'].filter(Boolean);
+    const vWhere = vFilterParts.length ? 'WHERE ' + vFilterParts.join(' AND ') : '';
+
     const govQuery = `
       SELECT
         g.Gov_Standard_Name AS name,
-        COUNT(DISTINCT v.qgs_fid) AS valuations,
-        COUNT(DISTINCT u.Original_Asset_Code) AS units,
-        COUNT(DISTINCT m.Map_ID_Internal) AS mapData
+        ISNULL(v.cnt, 0) AS valuations,
+        ISNULL(u.cnt, 0) AS units,
+        ISNULL(m.cnt, 0) AS mapData
       FROM Governorates_Lookup g
-      LEFT JOIN Asset_Valuations v ON g.Gov_ID = v.gov_serial
-        ${gov_serial ? '' : ''} ${authority_serial ? 'AND v.authority_serial = @authority_serial' : ''}
-      LEFT JOIN Assets_col_unit u ON g.Gov_ID = u.gov_serial
-        ${authority_serial ? 'AND u.authority_serial = @authority_serial' : ''}
-      LEFT JOIN interactiveMapData m ON g.Gov_ID = m.gov_serial
-        ${authority_serial ? 'AND m.authority_serial = @authority_serial' : ''}
+      LEFT JOIN (
+        SELECT gov_serial, COUNT(*) AS cnt
+        FROM Asset_Valuations ${vWhere}
+        GROUP BY gov_serial
+      ) v ON g.Gov_ID = v.gov_serial
+      LEFT JOIN (
+        SELECT gov_serial, COUNT(*) AS cnt
+        FROM Assets_col_unit ${vWhere}
+        GROUP BY gov_serial
+      ) u ON g.Gov_ID = u.gov_serial
+      LEFT JOIN (
+        SELECT gov_serial, COUNT(*) AS cnt
+        FROM interactiveMapData ${vWhere}
+        GROUP BY gov_serial
+      ) m ON g.Gov_ID = m.gov_serial
       ${gov_serial ? 'WHERE g.Gov_ID = @gov_serial' : ''}
-      GROUP BY g.Gov_Standard_Name
       ORDER BY g.Gov_Standard_Name
     `;
     const govResult = await request.query(govQuery);
 
-    // Authority breakdown
+    // Authority breakdown using pre-aggregated subqueries
     const request2 = p.request();
     if (gov_serial) request2.input('gov_serial', sql.Int, parseInt(gov_serial, 10));
     if (authority_serial) request2.input('authority_serial', sql.Int, parseInt(authority_serial, 10));
@@ -135,18 +135,26 @@ app.get('/api/analytics/counts', async (req, res) => {
     const authQuery = `
       SELECT
         a.AuthorityName AS name,
-        COUNT(DISTINCT v.qgs_fid) AS valuations,
-        COUNT(DISTINCT u.Original_Asset_Code) AS units,
-        COUNT(DISTINCT m.Map_ID_Internal) AS mapData
+        ISNULL(v.cnt, 0) AS valuations,
+        ISNULL(u.cnt, 0) AS units,
+        ISNULL(m.cnt, 0) AS mapData
       FROM Authorities_Lookup a
-      LEFT JOIN Asset_Valuations v ON a.auth_ID = v.authority_serial
-        ${gov_serial ? 'AND v.gov_serial = @gov_serial' : ''}
-      LEFT JOIN Assets_col_unit u ON a.auth_ID = u.authority_serial
-        ${gov_serial ? 'AND u.gov_serial = @gov_serial' : ''}
-      LEFT JOIN interactiveMapData m ON a.auth_ID = m.authority_serial
-        ${gov_serial ? 'AND m.gov_serial = @gov_serial' : ''}
+      LEFT JOIN (
+        SELECT authority_serial, COUNT(*) AS cnt
+        FROM Asset_Valuations ${vWhere}
+        GROUP BY authority_serial
+      ) v ON a.auth_ID = v.authority_serial
+      LEFT JOIN (
+        SELECT authority_serial, COUNT(*) AS cnt
+        FROM Assets_col_unit ${vWhere}
+        GROUP BY authority_serial
+      ) u ON a.auth_ID = u.authority_serial
+      LEFT JOIN (
+        SELECT authority_serial, COUNT(*) AS cnt
+        FROM interactiveMapData ${vWhere}
+        GROUP BY authority_serial
+      ) m ON a.auth_ID = m.authority_serial
       ${authority_serial ? 'WHERE a.auth_ID = @authority_serial' : ''}
-      GROUP BY a.AuthorityName
       ORDER BY a.AuthorityName
     `;
     const authResult = await request2.query(authQuery);
@@ -156,14 +164,11 @@ app.get('/api/analytics/counts', async (req, res) => {
     if (gov_serial) request3.input('gov_serial', sql.Int, parseInt(gov_serial, 10));
     if (authority_serial) request3.input('authority_serial', sql.Int, parseInt(authority_serial, 10));
 
-    const vWhere = [gov_serial && 'gov_serial = @gov_serial', authority_serial && 'authority_serial = @authority_serial'].filter(Boolean);
-    const vClause = vWhere.length ? 'WHERE ' + vWhere.join(' AND ') : '';
-
     const kpiQuery = `
       SELECT
-        (SELECT COUNT(*) FROM Asset_Valuations ${vClause}) AS totalValuations,
-        (SELECT COUNT(*) FROM Assets_col_unit ${vClause}) AS totalUnits,
-        (SELECT COUNT(*) FROM interactiveMapData ${vClause}) AS totalMapPoints
+        (SELECT COUNT(*) FROM Asset_Valuations ${vWhere}) AS totalValuations,
+        (SELECT COUNT(*) FROM Assets_col_unit ${vWhere}) AS totalUnits,
+        (SELECT COUNT(*) FROM interactiveMapData ${vWhere}) AS totalMapPoints
     `;
     const kpiResult = await request3.query(kpiQuery);
 
