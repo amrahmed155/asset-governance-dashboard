@@ -63,7 +63,7 @@ app.get('/api/lookups/authorities', async (_req, res) => {
   try {
     const p = await getPool();
     const result = await p.request().query(
-      `SELECT Authority_ID, AuthorityName FROM Authorities_Lookup ORDER BY AuthorityName`
+      `SELECT auth_ID, AuthorityName FROM Authorities_Lookup ORDER BY AuthorityName`
     );
     res.json(result.recordset);
   } catch (err) {
@@ -139,13 +139,13 @@ app.get('/api/analytics/counts', async (req, res) => {
         COUNT(DISTINCT u.Original_Asset_Code) AS units,
         COUNT(DISTINCT m.Map_ID_Internal) AS mapData
       FROM Authorities_Lookup a
-      LEFT JOIN Asset_Valuations v ON a.Authority_ID = v.authority_serial
+      LEFT JOIN Asset_Valuations v ON a.auth_ID = v.authority_serial
         ${gov_serial ? 'AND v.gov_serial = @gov_serial' : ''}
-      LEFT JOIN Assets_col_unit u ON a.Authority_ID = u.authority_serial
+      LEFT JOIN Assets_col_unit u ON a.auth_ID = u.authority_serial
         ${gov_serial ? 'AND u.gov_serial = @gov_serial' : ''}
-      LEFT JOIN interactiveMapData m ON a.Authority_ID = m.authority_serial
+      LEFT JOIN interactiveMapData m ON a.auth_ID = m.authority_serial
         ${gov_serial ? 'AND m.gov_serial = @gov_serial' : ''}
-      ${authority_serial ? 'WHERE a.Authority_ID = @authority_serial' : ''}
+      ${authority_serial ? 'WHERE a.auth_ID = @authority_serial' : ''}
       GROUP BY a.AuthorityName
       ORDER BY a.AuthorityName
     `;
@@ -219,7 +219,7 @@ app.get('/api/assets/duplicates', async (req, res) => {
         STRING_AGG(ca.Source, ', ') AS Sources
       FROM CombinedAssets ca
       LEFT JOIN Governorates_Lookup g ON ca.gov_serial = g.Gov_ID
-      LEFT JOIN Authorities_Lookup a ON ca.authority_serial = a.Authority_ID
+      LEFT JOIN Authorities_Lookup a ON ca.authority_serial = a.auth_ID
       GROUP BY ca.Descr, ca.gov_serial, ca.authority_serial,
                g.Gov_Standard_Name, a.AuthorityName
       HAVING COUNT(DISTINCT ca.Source) > 1
@@ -284,7 +284,7 @@ app.get('/api/assets/unique', async (req, res) => {
         gr.authority_serial
       FROM Grouped gr
       LEFT JOIN Governorates_Lookup g ON gr.gov_serial = g.Gov_ID
-      LEFT JOIN Authorities_Lookup a ON gr.authority_serial = a.Authority_ID
+      LEFT JOIN Authorities_Lookup a ON gr.authority_serial = a.auth_ID
       ORDER BY gr.Source, gr.Descr
     `;
     const result = await request.query(query);

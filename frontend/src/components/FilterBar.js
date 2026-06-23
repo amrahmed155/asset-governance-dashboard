@@ -39,7 +39,7 @@ export default function FilterBar({
       >
         <option value="">All Authorities</option>
         {authorities.map((a) => (
-          <option key={a.Authority_ID} value={a.Authority_ID}>
+          <option key={a.auth_ID} value={a.auth_ID}>
             {a.AuthorityName}
           </option>
         ))}
