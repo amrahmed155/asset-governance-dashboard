@@ -19,6 +19,7 @@ const dbConfig = {
     encrypt: process.env.DB_ENCRYPT === 'true',
     trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE !== 'false',
   },
+  connectionTimeout: 60000,
   requestTimeout: 60000,
   pool: {
     max: 10,
@@ -64,7 +65,7 @@ app.get('/api/lookups/authorities', async (_req, res) => {
   try {
     const p = await getPool();
     const result = await p.request().query(
-      `SELECT auth_ID, AuthorityName FROM Authorities_Lookup ORDER BY AuthorityName`
+      `SELECT AuthorityCode, AuthorityName FROM Authorities_Lookup ORDER BY AuthorityName`
     );
     res.json(result.recordset);
   } catch (err) {
@@ -72,27 +73,12 @@ app.get('/api/lookups/authorities', async (_req, res) => {
   }
 });
 
-// ─── Helper: build WHERE clause from filters ───────────────────────────────
-function buildFilters(request, govParam, authParam) {
-  const clauses = [];
-  if (govParam) {
-    request.input('gov_serial', sql.Int, parseInt(govParam, 10));
-    clauses.push('gov_serial = @gov_serial');
-  }
-  if (authParam) {
-    request.input('authority_serial', sql.Int, parseInt(authParam, 10));
-    clauses.push('authority_serial = @authority_serial');
-  }
-  return clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
-}
-
 // ─── Endpoint A: /api/analytics/counts ──────────────────────────────────────
 app.get('/api/analytics/counts', async (req, res) => {
   try {
     const { gov_serial, authority_serial } = req.query;
     const p = await getPool();
 
-    // Governorate breakdown using pre-aggregated subqueries to avoid cartesian product
     const request = p.request();
     if (gov_serial) request.input('gov_serial', sql.Int, parseInt(gov_serial, 10));
     if (authority_serial) request.input('authority_serial', sql.Int, parseInt(authority_serial, 10));
@@ -127,7 +113,6 @@ app.get('/api/analytics/counts', async (req, res) => {
     `;
     const govResult = await request.query(govQuery);
 
-    // Authority breakdown using pre-aggregated subqueries
     const request2 = p.request();
     if (gov_serial) request2.input('gov_serial', sql.Int, parseInt(gov_serial, 10));
     if (authority_serial) request2.input('authority_serial', sql.Int, parseInt(authority_serial, 10));
@@ -143,23 +128,22 @@ app.get('/api/analytics/counts', async (req, res) => {
         SELECT authority_serial, COUNT(*) AS cnt
         FROM Asset_Valuations ${vWhere}
         GROUP BY authority_serial
-      ) v ON a.auth_ID = v.authority_serial
+      ) v ON a.AuthorityCode = v.authority_serial
       LEFT JOIN (
         SELECT authority_serial, COUNT(*) AS cnt
         FROM Assets_col_unit ${vWhere}
         GROUP BY authority_serial
-      ) u ON a.auth_ID = u.authority_serial
+      ) u ON a.AuthorityCode = u.authority_serial
       LEFT JOIN (
         SELECT authority_serial, COUNT(*) AS cnt
         FROM interactiveMapData ${vWhere}
         GROUP BY authority_serial
-      ) m ON a.auth_ID = m.authority_serial
-      ${authority_serial ? 'WHERE a.auth_ID = @authority_serial' : ''}
+      ) m ON a.AuthorityCode = m.authority_serial
+      ${authority_serial ? 'WHERE a.AuthorityCode = @authority_serial' : ''}
       ORDER BY a.AuthorityName
     `;
     const authResult = await request2.query(authQuery);
 
-    // KPI totals
     const request3 = p.request();
     if (gov_serial) request3.input('gov_serial', sql.Int, parseInt(gov_serial, 10));
     if (authority_serial) request3.input('authority_serial', sql.Int, parseInt(authority_serial, 10));
@@ -202,31 +186,32 @@ app.get('/api/assets/duplicates', async (req, res) => {
 
     const query = `
       WITH CombinedAssets AS (
-        SELECT 'Valuations' AS Source, gov_serial, authority_serial,
-               Asset_Type AS Type, Asset_Details AS Descr
+        SELECT N'بيانات الاتصالات' AS Source, gov_serial, authority_serial,
+               AssetTypeID, Asset_Details AS Description
         FROM Asset_Valuations ${filterClause}
         UNION ALL
-        SELECT 'Units' AS Source, gov_serial, authority_serial,
-               Display_Asset_Type, Asset_Description
+        SELECT N'بيانات الامانة الفنية' AS Source, gov_serial, authority_serial,
+               AssetTypeID, Asset_Description
         FROM Assets_col_unit ${filterClause}
         UNION ALL
-        SELECT 'Map' AS Source, gov_serial, authority_serial,
-               Classification, Landmark_Name
+        SELECT N'بيانات خريطة تفاعلية' AS Source, gov_serial, authority_serial,
+               AssetTypeID, Landmark_Name
         FROM interactiveMapData ${filterClause}
       )
       SELECT
-        ca.Descr,
+        ca.Description,
         g.Gov_Standard_Name AS Governorate,
-        a.AuthorityName AS Authority,
-        ca.gov_serial,
-        ca.authority_serial,
+        al.AuthorityName AS Authority,
+        lk.Asset_Type,
+        lk.Asset_Sub_Type,
         COUNT(*) AS Occurrences,
-        STRING_AGG(ca.Source, ', ') AS Sources
+        STRING_AGG(ca.Source, N' + ') AS FoundIn
       FROM CombinedAssets ca
-      LEFT JOIN Governorates_Lookup g ON ca.gov_serial = g.Gov_ID
-      LEFT JOIN Authorities_Lookup a ON ca.authority_serial = a.auth_ID
-      GROUP BY ca.Descr, ca.gov_serial, ca.authority_serial,
-               g.Gov_Standard_Name, a.AuthorityName
+      JOIN Governorates_Lookup g ON ca.gov_serial = g.Gov_ID
+      JOIN Authorities_Lookup al ON ca.authority_serial = al.AuthorityCode
+      JOIN AssetLookup lk ON ca.AssetTypeID = lk.AssetTypeID
+      GROUP BY ca.Description, g.Gov_Standard_Name, al.AuthorityName,
+               lk.Asset_Type, lk.Asset_Sub_Type
       HAVING COUNT(DISTINCT ca.Source) > 1
       ORDER BY Occurrences DESC
     `;
@@ -257,40 +242,39 @@ app.get('/api/assets/unique', async (req, res) => {
 
     const query = `
       WITH CombinedAssets AS (
-        SELECT 'Valuations' AS Source, gov_serial, authority_serial,
-               Asset_Type AS Type, Asset_Details AS Descr
+        SELECT N'بيانات الاتصالات' AS Source, gov_serial, authority_serial,
+               AssetTypeID, Asset_Details AS Description
         FROM Asset_Valuations ${filterClause}
         UNION ALL
-        SELECT 'Units' AS Source, gov_serial, authority_serial,
-               Display_Asset_Type, Asset_Description
+        SELECT N'بيانات الامانة الفنية' AS Source, gov_serial, authority_serial,
+               AssetTypeID, Asset_Description
         FROM Assets_col_unit ${filterClause}
         UNION ALL
-        SELECT 'Map' AS Source, gov_serial, authority_serial,
-               Classification, Landmark_Name
+        SELECT N'بيانات خريطة تفاعلية' AS Source, gov_serial, authority_serial,
+               AssetTypeID, Landmark_Name
         FROM interactiveMapData ${filterClause}
       ),
       Grouped AS (
         SELECT
-          Descr, gov_serial, authority_serial,
+          Description, gov_serial, authority_serial, AssetTypeID,
           COUNT(DISTINCT Source) AS SourceCount,
-          MIN(Source) AS Source,
-          MIN(Type) AS Type
+          MIN(Source) AS Source
         FROM CombinedAssets
-        GROUP BY Descr, gov_serial, authority_serial
+        GROUP BY Description, gov_serial, authority_serial, AssetTypeID
         HAVING COUNT(DISTINCT Source) = 1
       )
       SELECT
         gr.Source,
-        gr.Descr,
-        gr.Type,
+        gr.Description,
         g.Gov_Standard_Name AS Governorate,
-        a.AuthorityName AS Authority,
-        gr.gov_serial,
-        gr.authority_serial
+        al.AuthorityName AS Authority,
+        lk.Asset_Type,
+        lk.Asset_Sub_Type
       FROM Grouped gr
-      LEFT JOIN Governorates_Lookup g ON gr.gov_serial = g.Gov_ID
-      LEFT JOIN Authorities_Lookup a ON gr.authority_serial = a.auth_ID
-      ORDER BY gr.Source, gr.Descr
+      JOIN Governorates_Lookup g ON gr.gov_serial = g.Gov_ID
+      JOIN Authorities_Lookup al ON gr.authority_serial = al.AuthorityCode
+      JOIN AssetLookup lk ON gr.AssetTypeID = lk.AssetTypeID
+      ORDER BY gr.Source, gr.Description
     `;
     const result = await request.query(query);
     res.json(result.recordset);

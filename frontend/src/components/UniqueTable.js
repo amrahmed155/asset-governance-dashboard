@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { Fingerprint, Search } from 'lucide-react';
 
 const SOURCE_BADGE = {
-  Valuations: 'bg-emerald-100 text-emerald-700',
-  Units: 'bg-blue-100 text-blue-700',
-  Map: 'bg-orange-100 text-orange-700',
+  'بيانات الاتصالات': 'bg-emerald-100 text-emerald-700',
+  'بيانات الامانة الفنية': 'bg-blue-100 text-blue-700',
+  'بيانات خريطة تفاعلية': 'bg-orange-100 text-orange-700',
 };
 
 export default function UniqueTable({ data, loading }) {
@@ -16,9 +16,10 @@ export default function UniqueTable({ data, loading }) {
     if (!search) return true;
     const q = search.toLowerCase();
     return (
-      (row.Descr || '').toLowerCase().includes(q) ||
+      (row.Description || '').toLowerCase().includes(q) ||
       (row.Governorate || '').toLowerCase().includes(q) ||
       (row.Authority || '').toLowerCase().includes(q) ||
+      (row.Asset_Type || '').toLowerCase().includes(q) ||
       (row.Source || '').toLowerCase().includes(q)
     );
   });
@@ -55,7 +56,8 @@ export default function UniqueTable({ data, loading }) {
             <tr className="bg-gray-50 text-left">
               <th className="px-6 py-3 font-semibold text-gray-600">Source</th>
               <th className="px-6 py-3 font-semibold text-gray-600">Description</th>
-              <th className="px-6 py-3 font-semibold text-gray-600">Type</th>
+              <th className="px-6 py-3 font-semibold text-gray-600">Asset Type</th>
+              <th className="px-6 py-3 font-semibold text-gray-600">Sub Type</th>
               <th className="px-6 py-3 font-semibold text-gray-600">Governorate</th>
               <th className="px-6 py-3 font-semibold text-gray-600">Authority</th>
             </tr>
@@ -63,13 +65,19 @@ export default function UniqueTable({ data, loading }) {
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan="5" className="px-6 py-10 text-center text-gray-400">
-                  Loading...
+                <td colSpan="6" className="px-6 py-10 text-center text-gray-400">
+                  <div className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Loading data...
+                  </div>
                 </td>
               </tr>
             ) : paginated.length === 0 ? (
               <tr>
-                <td colSpan="5" className="px-6 py-10 text-center text-gray-400">
+                <td colSpan="6" className="px-6 py-10 text-center text-gray-400">
                   No unique records found
                 </td>
               </tr>
@@ -85,12 +93,13 @@ export default function UniqueTable({ data, loading }) {
                       {row.Source}
                     </span>
                   </td>
-                  <td className="px-6 py-3 text-gray-800 max-w-xs truncate" title={row.Descr}>
-                    {row.Descr || '—'}
+                  <td className="px-6 py-3 text-gray-800 max-w-xs truncate" title={row.Description}>
+                    {row.Description || '\u2014'}
                   </td>
-                  <td className="px-6 py-3 text-gray-600">{row.Type || '—'}</td>
-                  <td className="px-6 py-3 text-gray-600">{row.Governorate || '—'}</td>
-                  <td className="px-6 py-3 text-gray-600">{row.Authority || '—'}</td>
+                  <td className="px-6 py-3 text-gray-600">{row.Asset_Type || '\u2014'}</td>
+                  <td className="px-6 py-3 text-gray-600">{row.Asset_Sub_Type || '\u2014'}</td>
+                  <td className="px-6 py-3 text-gray-600">{row.Governorate || '\u2014'}</td>
+                  <td className="px-6 py-3 text-gray-600">{row.Authority || '\u2014'}</td>
                 </tr>
               ))
             )}

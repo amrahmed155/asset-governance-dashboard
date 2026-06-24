@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { fetchDuplicates, fetchUnique } from '../services/api';
 import DuplicateTable from '../components/DuplicateTable';
 import UniqueTable from '../components/UniqueTable';
-
-
 export default function DeduplicationEngine({ filters }) {
   const [duplicates, setDuplicates] = useState([]);
   const [unique, setUnique] = useState([]);

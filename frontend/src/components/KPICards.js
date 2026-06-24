@@ -4,7 +4,7 @@ import { Building2, DollarSign, MapPin } from 'lucide-react';
 const CARDS = [
   {
     key: 'totalUnits',
-    label: 'Total Units',
+    label: 'بيانات الامانة الفنية',
     icon: Building2,
     color: 'bg-blue-500',
     lightBg: 'bg-blue-50',
@@ -12,7 +12,7 @@ const CARDS = [
   },
   {
     key: 'totalValuations',
-    label: 'Total Valuations',
+    label: 'بيانات الاتصالات',
     icon: DollarSign,
     color: 'bg-emerald-500',
     lightBg: 'bg-emerald-50',
@@ -20,7 +20,7 @@ const CARDS = [
   },
   {
     key: 'totalMapPoints',
-    label: 'Total Map Points',
+    label: 'بيانات خريطة تفاعلية',
     icon: MapPin,
     color: 'bg-orange-500',
     lightBg: 'bg-orange-50',
@@ -42,7 +42,7 @@ export default function KPICards({ kpi }) {
           <div>
             <p className="text-sm text-gray-500 font-medium">{label}</p>
             <p className="text-2xl font-bold text-gray-900">
-              {kpi ? Number(kpi[key] || 0).toLocaleString() : '—'}
+              {kpi ? Number(kpi[key] || 0).toLocaleString() : '\u2014'}
             </p>
           </div>
         </div>

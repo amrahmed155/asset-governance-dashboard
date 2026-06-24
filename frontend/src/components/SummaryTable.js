@@ -34,9 +34,9 @@ export default function SummaryTable({ data }) {
 
   const columns = [
     { key: 'name', label: 'Authority' },
-    { key: 'units', label: 'Unit Count', color: 'text-blue-600' },
-    { key: 'valuations', label: 'Valuation Count', color: 'text-emerald-600' },
-    { key: 'mapData', label: 'Map Count', color: 'text-orange-600' },
+    { key: 'units', label: 'بيانات الامانة الفنية', color: 'text-blue-600' },
+    { key: 'valuations', label: 'بيانات الاتصالات', color: 'text-emerald-600' },
+    { key: 'mapData', label: 'بيانات خريطة تفاعلية', color: 'text-orange-600' },
   ];
 
   return (

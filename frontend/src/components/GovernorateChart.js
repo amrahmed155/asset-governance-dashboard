@@ -50,9 +50,9 @@ export default function GovernorateChart({ data }) {
             }}
           />
           <Legend wrapperStyle={{ paddingTop: 16 }} />
-          <Bar dataKey="units" name="Units" fill={COLORS.units} radius={[4, 4, 0, 0]} />
-          <Bar dataKey="valuations" name="Valuations" fill={COLORS.valuations} radius={[4, 4, 0, 0]} />
-          <Bar dataKey="mapData" name="Map Data" fill={COLORS.mapData} radius={[4, 4, 0, 0]} />
+          <Bar dataKey="units" name="بيانات الامانة الفنية" fill={COLORS.units} radius={[4, 4, 0, 0]} />
+          <Bar dataKey="valuations" name="بيانات الاتصالات" fill={COLORS.valuations} radius={[4, 4, 0, 0]} />
+          <Bar dataKey="mapData" name="بيانات خريطة تفاعلية" fill={COLORS.mapData} radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

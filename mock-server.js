@@ -12,11 +12,11 @@ const governorates = [
 ];
 
 const authorities = [
-  { auth_ID: 1, AuthorityName: 'Ministry of Finance' },
-  { auth_ID: 2, AuthorityName: 'Ministry of Housing' },
-  { auth_ID: 3, AuthorityName: 'Ministry of Education' },
-  { auth_ID: 4, AuthorityName: 'Ministry of Health' },
-  { auth_ID: 5, AuthorityName: 'Ministry of Transport' },
+  { AuthorityCode: 1, AuthorityName: 'Ministry of Finance' },
+  { AuthorityCode: 2, AuthorityName: 'Ministry of Housing' },
+  { AuthorityCode: 3, AuthorityName: 'Ministry of Education' },
+  { AuthorityCode: 4, AuthorityName: 'Ministry of Health' },
+  { AuthorityCode: 5, AuthorityName: 'Ministry of Transport' },
 ];
 
 app.get('/api/health', (_req, res) => res.json({ status: 'connected' }));
@@ -63,22 +63,22 @@ app.get('/api/analytics/counts', (req, res) => {
 
 app.get('/api/assets/duplicates', (_req, res) => {
   res.json([
-    { Descr: 'Government Office Building A', Governorate: 'Cairo', Authority: 'Ministry of Finance', Occurrences: 3, Sources: 'Valuations, Units, Map' },
-    { Descr: 'Public School Complex #12', Governorate: 'Giza', Authority: 'Ministry of Education', Occurrences: 2, Sources: 'Units, Map' },
-    { Descr: 'District Hospital - West Wing', Governorate: 'Alexandria', Authority: 'Ministry of Health', Occurrences: 2, Sources: 'Valuations, Units' },
-    { Descr: 'National Museum Annex', Governorate: 'Luxor', Authority: 'Ministry of Finance', Occurrences: 2, Sources: 'Valuations, Map' },
-    { Descr: 'Highway Bridge #45', Governorate: 'Cairo', Authority: 'Ministry of Transport', Occurrences: 2, Sources: 'Units, Map' },
+    { Description: 'Government Office Building A', Governorate: 'Cairo', Authority: 'Ministry of Finance', Asset_Type: 'Commercial', Asset_Sub_Type: 'Office', Occurrences: 3, FoundIn: '\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u062a\u0635\u0627\u0644\u0627\u062a + \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u0645\u0627\u0646\u0629 \u0627\u0644\u0641\u0646\u064a\u0629 + \u0628\u064a\u0627\u0646\u0627\u062a \u062e\u0631\u064a\u0637\u0629 \u062a\u0641\u0627\u0639\u0644\u064a\u0629' },
+    { Description: 'Public School Complex #12', Governorate: 'Giza', Authority: 'Ministry of Education', Asset_Type: 'Educational', Asset_Sub_Type: 'School', Occurrences: 2, FoundIn: '\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u0645\u0627\u0646\u0629 \u0627\u0644\u0641\u0646\u064a\u0629 + \u0628\u064a\u0627\u0646\u0627\u062a \u062e\u0631\u064a\u0637\u0629 \u062a\u0641\u0627\u0639\u0644\u064a\u0629' },
+    { Description: 'District Hospital - West Wing', Governorate: 'Alexandria', Authority: 'Ministry of Health', Asset_Type: 'Medical', Asset_Sub_Type: 'Hospital', Occurrences: 2, FoundIn: '\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u062a\u0635\u0627\u0644\u0627\u062a + \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u0645\u0627\u0646\u0629 \u0627\u0644\u0641\u0646\u064a\u0629' },
+    { Description: 'National Museum Annex', Governorate: 'Luxor', Authority: 'Ministry of Finance', Asset_Type: 'Heritage', Asset_Sub_Type: 'Museum', Occurrences: 2, FoundIn: '\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u062a\u0635\u0627\u0644\u0627\u062a + \u0628\u064a\u0627\u0646\u0627\u062a \u062e\u0631\u064a\u0637\u0629 \u062a\u0641\u0627\u0639\u0644\u064a\u0629' },
+    { Description: 'Highway Bridge #45', Governorate: 'Cairo', Authority: 'Ministry of Transport', Asset_Type: 'Infrastructure', Asset_Sub_Type: 'Bridge', Occurrences: 2, FoundIn: '\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u0645\u0627\u0646\u0629 \u0627\u0644\u0641\u0646\u064a\u0629 + \u0628\u064a\u0627\u0646\u0627\u062a \u062e\u0631\u064a\u0637\u0629 \u062a\u0641\u0627\u0639\u0644\u064a\u0629' },
   ]);
 });
 
 app.get('/api/assets/unique', (_req, res) => {
   res.json([
-    { Source: 'Valuations', Descr: 'Central Bank Branch Office', Type: 'Commercial', Governorate: 'Cairo', Authority: 'Ministry of Finance' },
-    { Source: 'Units', Descr: 'Residential Block 7A', Type: 'Residential', Governorate: 'Giza', Authority: 'Ministry of Housing' },
-    { Source: 'Map', Descr: 'Heritage Site - Temple of Karnak', Type: 'Heritage', Governorate: 'Luxor', Authority: 'Ministry of Finance' },
-    { Source: 'Valuations', Descr: 'Industrial Zone Warehouse', Type: 'Industrial', Governorate: 'Alexandria', Authority: 'Ministry of Transport' },
-    { Source: 'Units', Descr: 'Primary Care Clinic - Rural', Type: 'Medical', Governorate: 'Aswan', Authority: 'Ministry of Health' },
-    { Source: 'Map', Descr: 'Water Treatment Plant #3', Type: 'Infrastructure', Governorate: 'Cairo', Authority: 'Ministry of Housing' },
+    { Source: '\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u062a\u0635\u0627\u0644\u0627\u062a', Description: 'Central Bank Branch Office', Asset_Type: 'Commercial', Asset_Sub_Type: 'Office', Governorate: 'Cairo', Authority: 'Ministry of Finance' },
+    { Source: '\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u0645\u0627\u0646\u0629 \u0627\u0644\u0641\u0646\u064a\u0629', Description: 'Residential Block 7A', Asset_Type: 'Residential', Asset_Sub_Type: 'Apartment', Governorate: 'Giza', Authority: 'Ministry of Housing' },
+    { Source: '\u0628\u064a\u0627\u0646\u0627\u062a \u062e\u0631\u064a\u0637\u0629 \u062a\u0641\u0627\u0639\u0644\u064a\u0629', Description: 'Heritage Site - Temple of Karnak', Asset_Type: 'Heritage', Asset_Sub_Type: 'Temple', Governorate: 'Luxor', Authority: 'Ministry of Finance' },
+    { Source: '\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u062a\u0635\u0627\u0644\u0627\u062a', Description: 'Industrial Zone Warehouse', Asset_Type: 'Industrial', Asset_Sub_Type: 'Warehouse', Governorate: 'Alexandria', Authority: 'Ministry of Transport' },
+    { Source: '\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u0645\u0627\u0646\u0629 \u0627\u0644\u0641\u0646\u064a\u0629', Description: 'Primary Care Clinic - Rural', Asset_Type: 'Medical', Asset_Sub_Type: 'Clinic', Governorate: 'Aswan', Authority: 'Ministry of Health' },
+    { Source: '\u0628\u064a\u0627\u0646\u0627\u062a \u062e\u0631\u064a\u0637\u0629 \u062a\u0641\u0627\u0639\u0644\u064a\u0629', Description: 'Water Treatment Plant #3', Asset_Type: 'Infrastructure', Asset_Sub_Type: 'Water', Governorate: 'Cairo', Authority: 'Ministry of Housing' },
   ]);
 });
 
