@@ -37,6 +37,16 @@ CREATE NONCLUSTERED INDEX IX_interactiveMapData_authority_serial
 CREATE NONCLUSTERED INDEX IX_interactiveMapData_AssetTypeID
   ON [dbo].[interactiveMapData] ([AssetTypeID]);
 
+-- Composite indexes for deduplication GROUP BY (gov_serial, authority_serial, AssetTypeID)
+CREATE NONCLUSTERED INDEX IX_Asset_Valuations_dedup
+  ON [dbo].[Asset_Valuations] ([gov_serial], [authority_serial], [AssetTypeID]);
+
+CREATE NONCLUSTERED INDEX IX_Assets_col_unit_dedup
+  ON [dbo].[Assets_col_unit] ([gov_serial], [authority_serial], [AssetTypeID]);
+
+CREATE NONCLUSTERED INDEX IX_interactiveMapData_dedup
+  ON [dbo].[interactiveMapData] ([gov_serial], [authority_serial], [AssetTypeID]);
+
 -- Authorities_Lookup index on AuthorityCode (used for joins)
 CREATE NONCLUSTERED INDEX IX_Authorities_Lookup_AuthorityCode
   ON [dbo].[Authorities_Lookup] ([AuthorityCode])

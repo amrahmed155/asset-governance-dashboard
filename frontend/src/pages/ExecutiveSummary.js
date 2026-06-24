@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { fetchAnalyticsCounts } from '../services/api';
+import { fetchAnalyticsCounts, fetchAssetSummary } from '../services/api';
 import KPICards from '../components/KPICards';
 import GovernorateChart from '../components/GovernorateChart';
 import AuthorityPieChart from '../components/AuthorityPieChart';
 import SummaryTable from '../components/SummaryTable';
+import AssetSummaryTable from '../components/AssetSummaryTable';
 import DynamicChart from '../components/DynamicChart';
 import { Loader2 } from 'lucide-react';
 
 export default function ExecutiveSummary({ filters }) {
   const [data, setData] = useState(null);
+  const [assetSummary, setAssetSummary] = useState([]);
+  const [assetSummaryLoading, setAssetSummaryLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -16,14 +19,24 @@ export default function ExecutiveSummary({ filters }) {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setAssetSummaryLoading(true);
       setError(null);
       try {
-        const result = await fetchAnalyticsCounts(filters);
-        if (!cancelled) setData(result);
+        const [result, summary] = await Promise.all([
+          fetchAnalyticsCounts(filters),
+          fetchAssetSummary(filters),
+        ]);
+        if (!cancelled) {
+          setData(result);
+          setAssetSummary(summary);
+        }
       } catch (err) {
         if (!cancelled) setError(err.message);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setAssetSummaryLoading(false);
+        }
       }
     }
     load();
@@ -56,6 +69,7 @@ export default function ExecutiveSummary({ filters }) {
         <AuthorityPieChart data={data?.byAuthority} />
       </div>
       <SummaryTable data={data?.byAuthority} />
+      <AssetSummaryTable data={assetSummary} loading={assetSummaryLoading} />
       <DynamicChart />
     </div>
   );

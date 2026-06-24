@@ -19,8 +19,8 @@ const dbConfig = {
     encrypt: process.env.DB_ENCRYPT === 'true',
     trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE !== 'false',
   },
-  connectionTimeout: 60000,
-  requestTimeout: 60000,
+  connectionTimeout: 120000,
+  requestTimeout: 120000,
   pool: {
     max: 10,
     min: 0,
@@ -296,44 +296,54 @@ app.get('/api/assets/duplicates', async (req, res) => {
 
     const query = `
       WITH CombinedAssets AS (
-        SELECT N'بيانات الاتصالات' AS Source, gov_serial, authority_serial,
-               AssetTypeID, Asset_Details AS Description
+        SELECT N'\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u062a\u0635\u0627\u0644\u0627\u062a' AS Source, gov_serial, authority_serial,
+               AssetTypeID, CHECKSUM(Asset_Details) AS DescHash,
+               CAST(LEFT(ISNULL(Asset_Details, N''), 200) AS NVARCHAR(200)) AS Description
         FROM Asset_Valuations ${filterClause}
         UNION ALL
-        SELECT N'بيانات الامانة الفنية' AS Source, gov_serial, authority_serial,
-               AssetTypeID, Asset_Description
+        SELECT N'\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u0645\u0627\u0646\u0629 \u0627\u0644\u0641\u0646\u064a\u0629', gov_serial, authority_serial,
+               AssetTypeID, CHECKSUM(Asset_Description),
+               CAST(LEFT(ISNULL(Asset_Description, N''), 200) AS NVARCHAR(200))
         FROM Assets_col_unit ${filterClause}
         UNION ALL
-        SELECT N'بيانات خريطة تفاعلية' AS Source, gov_serial, authority_serial,
-               AssetTypeID, Landmark_Name
+        SELECT N'\u0628\u064a\u0627\u0646\u0627\u062a \u062e\u0631\u064a\u0637\u0629 \u062a\u0641\u0627\u0639\u0644\u064a\u0629', gov_serial, authority_serial,
+               AssetTypeID, CHECKSUM(Landmark_Name),
+               CAST(LEFT(ISNULL(Landmark_Name, N''), 200) AS NVARCHAR(200))
         FROM interactiveMapData ${filterClause}
+      ),
+      Grouped AS (
+        SELECT
+          DescHash, gov_serial, authority_serial, AssetTypeID,
+          MIN(Description) AS Description,
+          COUNT(*) AS Occurrences,
+          COUNT(DISTINCT Source) AS SourceCount,
+          STRING_AGG(Source, N' + ') AS FoundIn
+        FROM CombinedAssets
+        GROUP BY DescHash, gov_serial, authority_serial, AssetTypeID
+        HAVING COUNT(DISTINCT Source) > 1
       )
-      SELECT
-        ca.Description,
+      SELECT TOP 500
+        gr.Description,
         g.Gov_Standard_Name AS Governorate,
         al.AuthorityName AS Authority,
         lk.Asset_Type,
         lk.Asset_Sub_Type,
-        COUNT(*) AS Occurrences,
-        STRING_AGG(ca.Source, N' + ') AS FoundIn,
+        gr.Occurrences,
+        gr.FoundIn,
         CASE
-          WHEN COUNT(DISTINCT ca.Source) = 3 THEN 100
-          WHEN COUNT(DISTINCT ca.Source) = 2 THEN
-            CASE
-              WHEN COUNT(*) >= 4 THEN 90
-              WHEN COUNT(*) >= 3 THEN 85
-              ELSE 75
+          WHEN gr.SourceCount = 3 THEN 100
+          WHEN gr.SourceCount = 2 THEN
+            CASE WHEN gr.Occurrences >= 4 THEN 90
+                 WHEN gr.Occurrences >= 3 THEN 85
+                 ELSE 75
             END
           ELSE 50
         END AS Certainty
-      FROM CombinedAssets ca
-      JOIN Governorates_Lookup g ON ca.gov_serial = g.Gov_ID
-      JOIN Authorities_Lookup al ON ca.authority_serial = al.AuthorityCode
-      JOIN AssetLookup lk ON ca.AssetTypeID = lk.AssetTypeID
-      GROUP BY ca.Description, g.Gov_Standard_Name, al.AuthorityName,
-               lk.Asset_Type, lk.Asset_Sub_Type
-      HAVING COUNT(DISTINCT ca.Source) > 1
-      ORDER BY Certainty DESC, Occurrences DESC
+      FROM Grouped gr
+      JOIN Governorates_Lookup g ON gr.gov_serial = g.Gov_ID
+      JOIN Authorities_Lookup al ON gr.authority_serial = al.AuthorityCode
+      JOIN AssetLookup lk ON gr.AssetTypeID = lk.AssetTypeID
+      ORDER BY Certainty DESC, gr.Occurrences DESC
     `;
     const result = await request.query(query);
     res.json(result.recordset);
@@ -370,28 +380,32 @@ app.get('/api/assets/unique', async (req, res) => {
 
     const query = `
       WITH CombinedAssets AS (
-        SELECT N'بيانات الاتصالات' AS Source, gov_serial, authority_serial,
-               AssetTypeID, Asset_Details AS Description
+        SELECT N'\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u062a\u0635\u0627\u0644\u0627\u062a' AS Source, gov_serial, authority_serial,
+               AssetTypeID, CHECKSUM(Asset_Details) AS DescHash,
+               CAST(LEFT(ISNULL(Asset_Details, N''), 200) AS NVARCHAR(200)) AS Description
         FROM Asset_Valuations ${filterClause}
         UNION ALL
-        SELECT N'بيانات الامانة الفنية' AS Source, gov_serial, authority_serial,
-               AssetTypeID, Asset_Description
+        SELECT N'\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u0645\u0627\u0646\u0629 \u0627\u0644\u0641\u0646\u064a\u0629', gov_serial, authority_serial,
+               AssetTypeID, CHECKSUM(Asset_Description),
+               CAST(LEFT(ISNULL(Asset_Description, N''), 200) AS NVARCHAR(200))
         FROM Assets_col_unit ${filterClause}
         UNION ALL
-        SELECT N'بيانات خريطة تفاعلية' AS Source, gov_serial, authority_serial,
-               AssetTypeID, Landmark_Name
+        SELECT N'\u0628\u064a\u0627\u0646\u0627\u062a \u062e\u0631\u064a\u0637\u0629 \u062a\u0641\u0627\u0639\u0644\u064a\u0629', gov_serial, authority_serial,
+               AssetTypeID, CHECKSUM(Landmark_Name),
+               CAST(LEFT(ISNULL(Landmark_Name, N''), 200) AS NVARCHAR(200))
         FROM interactiveMapData ${filterClause}
       ),
       Grouped AS (
         SELECT
-          Description, gov_serial, authority_serial, AssetTypeID,
+          DescHash, gov_serial, authority_serial, AssetTypeID,
+          MIN(Description) AS Description,
           COUNT(DISTINCT Source) AS SourceCount,
           MIN(Source) AS Source
         FROM CombinedAssets
-        GROUP BY Description, gov_serial, authority_serial, AssetTypeID
+        GROUP BY DescHash, gov_serial, authority_serial, AssetTypeID
         HAVING COUNT(DISTINCT Source) = 1
       )
-      SELECT
+      SELECT TOP 500
         gr.Source,
         gr.Description,
         g.Gov_Standard_Name AS Governorate,
@@ -403,6 +417,68 @@ app.get('/api/assets/unique', async (req, res) => {
       JOIN Authorities_Lookup al ON gr.authority_serial = al.AuthorityCode
       JOIN AssetLookup lk ON gr.AssetTypeID = lk.AssetTypeID
       ORDER BY gr.Source, gr.Description
+    `;
+    const result = await request.query(query);
+    res.json(result.recordset);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Endpoint E: /api/analytics/asset-summary ───────────────────────────────
+app.get('/api/analytics/asset-summary', async (req, res) => {
+  try {
+    const { gov_serial, authority_serial, asset_type, asset_sub_type } = req.query;
+    const p = await getPool();
+    const request = p.request();
+
+    const filters = [];
+    if (gov_serial) {
+      request.input('gov_serial', sql.Int, parseInt(gov_serial, 10));
+      filters.push('combined.gov_serial = @gov_serial');
+    }
+    if (authority_serial) {
+      request.input('authority_serial', sql.Int, parseInt(authority_serial, 10));
+      filters.push('combined.authority_serial = @authority_serial');
+    }
+    if (asset_type) {
+      request.input('asset_type', sql.NVarChar, asset_type);
+      filters.push('lk.Asset_Type = @asset_type');
+    }
+    if (asset_sub_type) {
+      request.input('asset_sub_type', sql.NVarChar, asset_sub_type);
+      filters.push('lk.Asset_Sub_Type = @asset_sub_type');
+    }
+    const havingClause = filters.length ? 'WHERE ' + filters.join(' AND ') : '';
+
+    const query = `
+      SELECT
+        lk.Asset_Type,
+        lk.Asset_Sub_Type,
+        g.Gov_Standard_Name AS Governorate,
+        al.AuthorityName AS Authority,
+        ISNULL(SUM(CASE WHEN combined.src = 'v' THEN combined.cnt ELSE 0 END), 0) AS valuations,
+        ISNULL(SUM(CASE WHEN combined.src = 'u' THEN combined.cnt ELSE 0 END), 0) AS units,
+        ISNULL(SUM(CASE WHEN combined.src = 'm' THEN combined.cnt ELSE 0 END), 0) AS mapData
+      FROM (
+        SELECT 'v' AS src, AssetTypeID, gov_serial, authority_serial, COUNT(*) AS cnt
+        FROM Asset_Valuations WHERE AssetTypeID IS NOT NULL GROUP BY AssetTypeID, gov_serial, authority_serial
+        UNION ALL
+        SELECT 'u', AssetTypeID, gov_serial, authority_serial, COUNT(*)
+        FROM Assets_col_unit WHERE AssetTypeID IS NOT NULL GROUP BY AssetTypeID, gov_serial, authority_serial
+        UNION ALL
+        SELECT 'm', AssetTypeID, gov_serial, authority_serial, COUNT(*)
+        FROM interactiveMapData WHERE AssetTypeID IS NOT NULL GROUP BY AssetTypeID, gov_serial, authority_serial
+      ) combined
+      JOIN AssetLookup lk ON combined.AssetTypeID = lk.AssetTypeID
+      JOIN Governorates_Lookup g ON combined.gov_serial = g.Gov_ID
+      JOIN Authorities_Lookup al ON combined.authority_serial = al.AuthorityCode
+      ${havingClause}
+      GROUP BY lk.Asset_Type, lk.Asset_Sub_Type, g.Gov_Standard_Name, al.AuthorityName
+      ORDER BY
+        (ISNULL(SUM(CASE WHEN combined.src = 'v' THEN combined.cnt ELSE 0 END), 0)
+        + ISNULL(SUM(CASE WHEN combined.src = 'u' THEN combined.cnt ELSE 0 END), 0)
+        + ISNULL(SUM(CASE WHEN combined.src = 'm' THEN combined.cnt ELSE 0 END), 0)) DESC
     `;
     const result = await request.query(query);
     res.json(result.recordset);

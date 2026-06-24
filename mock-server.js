@@ -105,6 +105,40 @@ app.get('/api/assets/unique', (_req, res) => {
   ]);
 });
 
+app.get('/api/analytics/asset-summary', (req, res) => {
+  const summaryData = [
+    { Asset_Type: 'Commercial', Asset_Sub_Type: 'Office', Governorate: 'Cairo', Authority: 'Ministry of Finance', valuations: 45, units: 80, mapData: 25 },
+    { Asset_Type: 'Commercial', Asset_Sub_Type: 'Retail', Governorate: 'Cairo', Authority: 'Ministry of Housing', valuations: 30, units: 60, mapData: 20 },
+    { Asset_Type: 'Commercial', Asset_Sub_Type: 'Warehouse', Governorate: 'Giza', Authority: 'Ministry of Transport', valuations: 15, units: 35, mapData: 10 },
+    { Asset_Type: 'Residential', Asset_Sub_Type: 'Apartment', Governorate: 'Cairo', Authority: 'Ministry of Housing', valuations: 60, units: 130, mapData: 25 },
+    { Asset_Type: 'Residential', Asset_Sub_Type: 'Villa', Governorate: 'Giza', Authority: 'Ministry of Housing', valuations: 20, units: 45, mapData: 10 },
+    { Asset_Type: 'Infrastructure', Asset_Sub_Type: 'Bridge', Governorate: 'Cairo', Authority: 'Ministry of Transport', valuations: 35, units: 70, mapData: 65 },
+    { Asset_Type: 'Infrastructure', Asset_Sub_Type: 'Road', Governorate: 'Alexandria', Authority: 'Ministry of Transport', valuations: 25, units: 50, mapData: 30 },
+    { Asset_Type: 'Infrastructure', Asset_Sub_Type: 'Water', Governorate: 'Aswan', Authority: 'Ministry of Housing', valuations: 20, units: 40, mapData: 25 },
+    { Asset_Type: 'Medical', Asset_Sub_Type: 'Hospital', Governorate: 'Alexandria', Authority: 'Ministry of Health', valuations: 45, units: 90, mapData: 55 },
+    { Asset_Type: 'Medical', Asset_Sub_Type: 'Clinic', Governorate: 'Luxor', Authority: 'Ministry of Health', valuations: 15, units: 30, mapData: 15 },
+    { Asset_Type: 'Educational', Asset_Sub_Type: 'School', Governorate: 'Giza', Authority: 'Ministry of Education', valuations: 40, units: 60, mapData: 30 },
+    { Asset_Type: 'Educational', Asset_Sub_Type: 'University', Governorate: 'Cairo', Authority: 'Ministry of Education', valuations: 10, units: 20, mapData: 10 },
+    { Asset_Type: 'Heritage', Asset_Sub_Type: 'Museum', Governorate: 'Cairo', Authority: 'Ministry of Finance', valuations: 15, units: 20, mapData: 18 },
+    { Asset_Type: 'Heritage', Asset_Sub_Type: 'Temple', Governorate: 'Luxor', Authority: 'Ministry of Finance', valuations: 10, units: 15, mapData: 12 },
+    { Asset_Type: 'Industrial', Asset_Sub_Type: 'Factory', Governorate: 'Alexandria', Authority: 'Ministry of Transport', valuations: 5, units: 10, mapData: 3 },
+    { Asset_Type: 'Industrial', Asset_Sub_Type: 'Plant', Governorate: 'Aswan', Authority: 'Ministry of Housing', valuations: 5, units: 10, mapData: 2 },
+  ];
+  let result = summaryData;
+  const { gov_serial, authority_serial, asset_type, asset_sub_type } = req.query;
+  if (asset_type) result = result.filter(r => r.Asset_Type === asset_type);
+  if (asset_sub_type) result = result.filter(r => r.Asset_Sub_Type === asset_sub_type);
+  if (gov_serial) {
+    const gov = governorates.find(g => g.Gov_ID === parseInt(gov_serial, 10));
+    if (gov) result = result.filter(r => r.Governorate === gov.Gov_Standard_Name);
+  }
+  if (authority_serial) {
+    const auth = authorities.find(a => a.AuthorityCode === parseInt(authority_serial, 10));
+    if (auth) result = result.filter(r => r.Authority === auth.AuthorityName);
+  }
+  res.json(result);
+});
+
 app.get('/api/analytics/dynamic', (req, res) => {
   const { dimension } = req.query;
   const dynamicData = {
