@@ -317,7 +317,7 @@ app.get('/api/assets/duplicates', async (req, res) => {
           MIN(Description) AS Description,
           COUNT(*) AS Occurrences,
           COUNT(DISTINCT Source) AS SourceCount,
-          STRING_AGG(Source, N' + ') AS FoundIn
+          STRING_AGG(CAST(Source AS NVARCHAR(MAX)), N' + ') AS FoundIn
         FROM CombinedAssets
         GROUP BY DescHash, gov_serial, authority_serial, AssetTypeID
         HAVING COUNT(DISTINCT Source) > 1
