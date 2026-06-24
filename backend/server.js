@@ -73,17 +73,119 @@ app.get('/api/lookups/authorities', async (_req, res) => {
   }
 });
 
+app.get('/api/lookups/asset-types', async (_req, res) => {
+  try {
+    const p = await getPool();
+    const result = await p.request().query(
+      `SELECT DISTINCT Asset_Type FROM AssetLookup WHERE Asset_Type IS NOT NULL ORDER BY Asset_Type`
+    );
+    res.json(result.recordset.map(r => r.Asset_Type));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/lookups/asset-sub-types', async (req, res) => {
+  try {
+    const { asset_type } = req.query;
+    const p = await getPool();
+    const request = p.request();
+    let query = `SELECT DISTINCT Asset_Sub_Type FROM AssetLookup WHERE Asset_Sub_Type IS NOT NULL`;
+    if (asset_type) {
+      request.input('asset_type', sql.NVarChar, asset_type);
+      query += ` AND Asset_Type = @asset_type`;
+    }
+    query += ` ORDER BY Asset_Sub_Type`;
+    const result = await request.query(query);
+    res.json(result.recordset.map(r => r.Asset_Sub_Type));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Endpoint D: /api/analytics/dynamic ─────────────────────────────────────
+app.get('/api/analytics/dynamic', async (req, res) => {
+  try {
+    const { dimension } = req.query;
+    const validDimensions = ['governorate', 'authority', 'asset_type', 'asset_sub_type'];
+    if (!dimension || !validDimensions.includes(dimension)) {
+      return res.status(400).json({ error: `dimension must be one of: ${validDimensions.join(', ')}` });
+    }
+
+    const p = await getPool();
+    const request = p.request();
+
+    const dimConfig = {
+      governorate: {
+        selectExpr: 'g.Gov_Standard_Name',
+        joinV: 'JOIN Governorates_Lookup g ON v.gov_serial = g.Gov_ID',
+        joinU: 'JOIN Governorates_Lookup g ON u.gov_serial = g.Gov_ID',
+        joinM: 'JOIN Governorates_Lookup g ON m.gov_serial = g.Gov_ID',
+      },
+      authority: {
+        selectExpr: 'al.AuthorityName',
+        joinV: 'JOIN Authorities_Lookup al ON v.authority_serial = al.AuthorityCode',
+        joinU: 'JOIN Authorities_Lookup al ON u.authority_serial = al.AuthorityCode',
+        joinM: 'JOIN Authorities_Lookup al ON m.authority_serial = al.AuthorityCode',
+      },
+      asset_type: {
+        selectExpr: 'lk.Asset_Type',
+        joinV: 'JOIN AssetLookup lk ON v.AssetTypeID = lk.AssetTypeID',
+        joinU: 'JOIN AssetLookup lk ON u.AssetTypeID = lk.AssetTypeID',
+        joinM: 'JOIN AssetLookup lk ON m.AssetTypeID = lk.AssetTypeID',
+      },
+      asset_sub_type: {
+        selectExpr: 'lk.Asset_Sub_Type',
+        joinV: 'JOIN AssetLookup lk ON v.AssetTypeID = lk.AssetTypeID',
+        joinU: 'JOIN AssetLookup lk ON u.AssetTypeID = lk.AssetTypeID',
+        joinM: 'JOIN AssetLookup lk ON m.AssetTypeID = lk.AssetTypeID',
+      },
+    };
+    const cfg = dimConfig[dimension];
+    const query = `
+      SELECT dim AS name,
+             ISNULL(SUM(valuations), 0) AS valuations,
+             ISNULL(SUM(units), 0) AS units,
+             ISNULL(SUM(mapData), 0) AS mapData
+      FROM (
+        SELECT ${cfg.selectExpr} AS dim, 1 AS valuations, 0 AS units, 0 AS mapData
+        FROM Asset_Valuations v ${cfg.joinV}
+        UNION ALL
+        SELECT ${cfg.selectExpr} AS dim, 0, 1, 0
+        FROM Assets_col_unit u ${cfg.joinU}
+        UNION ALL
+        SELECT ${cfg.selectExpr} AS dim, 0, 0, 1
+        FROM interactiveMapData m ${cfg.joinM}
+      ) combined
+      WHERE dim IS NOT NULL
+      GROUP BY dim
+      ORDER BY (ISNULL(SUM(valuations), 0) + ISNULL(SUM(units), 0) + ISNULL(SUM(mapData), 0)) DESC
+    `;
+    const result = await request.query(query);
+    res.json(result.recordset);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Endpoint A: /api/analytics/counts ──────────────────────────────────────
 app.get('/api/analytics/counts', async (req, res) => {
   try {
-    const { gov_serial, authority_serial } = req.query;
+    const { gov_serial, authority_serial, asset_type, asset_sub_type } = req.query;
     const p = await getPool();
 
     const request = p.request();
     if (gov_serial) request.input('gov_serial', sql.Int, parseInt(gov_serial, 10));
     if (authority_serial) request.input('authority_serial', sql.Int, parseInt(authority_serial, 10));
+    if (asset_type) request.input('asset_type', sql.NVarChar, asset_type);
+    if (asset_sub_type) request.input('asset_sub_type', sql.NVarChar, asset_sub_type);
 
-    const vFilterParts = [gov_serial && 'gov_serial = @gov_serial', authority_serial && 'authority_serial = @authority_serial'].filter(Boolean);
+    const vFilterParts = [
+      gov_serial && 'gov_serial = @gov_serial',
+      authority_serial && 'authority_serial = @authority_serial',
+      asset_type && 'AssetTypeID IN (SELECT AssetTypeID FROM AssetLookup WHERE Asset_Type = @asset_type)',
+      asset_sub_type && 'AssetTypeID IN (SELECT AssetTypeID FROM AssetLookup WHERE Asset_Sub_Type = @asset_sub_type)',
+    ].filter(Boolean);
     const vWhere = vFilterParts.length ? 'WHERE ' + vFilterParts.join(' AND ') : '';
 
     const govQuery = `
@@ -169,7 +271,7 @@ app.get('/api/analytics/counts', async (req, res) => {
 // ─── Endpoint B: /api/assets/duplicates ─────────────────────────────────────
 app.get('/api/assets/duplicates', async (req, res) => {
   try {
-    const { gov_serial, authority_serial } = req.query;
+    const { gov_serial, authority_serial, asset_type, asset_sub_type } = req.query;
     const p = await getPool();
     const request = p.request();
 
@@ -181,6 +283,14 @@ app.get('/api/assets/duplicates', async (req, res) => {
     if (authority_serial) {
       request.input('authority_serial', sql.Int, parseInt(authority_serial, 10));
       filters.push('authority_serial = @authority_serial');
+    }
+    if (asset_type) {
+      request.input('asset_type', sql.NVarChar, asset_type);
+      filters.push('AssetTypeID IN (SELECT AssetTypeID FROM AssetLookup WHERE Asset_Type = @asset_type)');
+    }
+    if (asset_sub_type) {
+      request.input('asset_sub_type', sql.NVarChar, asset_sub_type);
+      filters.push('AssetTypeID IN (SELECT AssetTypeID FROM AssetLookup WHERE Asset_Sub_Type = @asset_sub_type)');
     }
     const filterClause = filters.length ? 'WHERE ' + filters.join(' AND ') : '';
 
@@ -205,7 +315,17 @@ app.get('/api/assets/duplicates', async (req, res) => {
         lk.Asset_Type,
         lk.Asset_Sub_Type,
         COUNT(*) AS Occurrences,
-        STRING_AGG(ca.Source, N' + ') AS FoundIn
+        STRING_AGG(ca.Source, N' + ') AS FoundIn,
+        CASE
+          WHEN COUNT(DISTINCT ca.Source) = 3 THEN 100
+          WHEN COUNT(DISTINCT ca.Source) = 2 THEN
+            CASE
+              WHEN COUNT(*) >= 4 THEN 90
+              WHEN COUNT(*) >= 3 THEN 85
+              ELSE 75
+            END
+          ELSE 50
+        END AS Certainty
       FROM CombinedAssets ca
       JOIN Governorates_Lookup g ON ca.gov_serial = g.Gov_ID
       JOIN Authorities_Lookup al ON ca.authority_serial = al.AuthorityCode
@@ -213,7 +333,7 @@ app.get('/api/assets/duplicates', async (req, res) => {
       GROUP BY ca.Description, g.Gov_Standard_Name, al.AuthorityName,
                lk.Asset_Type, lk.Asset_Sub_Type
       HAVING COUNT(DISTINCT ca.Source) > 1
-      ORDER BY Occurrences DESC
+      ORDER BY Certainty DESC, Occurrences DESC
     `;
     const result = await request.query(query);
     res.json(result.recordset);
@@ -225,7 +345,7 @@ app.get('/api/assets/duplicates', async (req, res) => {
 // ─── Endpoint C: /api/assets/unique ─────────────────────────────────────────
 app.get('/api/assets/unique', async (req, res) => {
   try {
-    const { gov_serial, authority_serial } = req.query;
+    const { gov_serial, authority_serial, asset_type, asset_sub_type } = req.query;
     const p = await getPool();
     const request = p.request();
 
@@ -237,6 +357,14 @@ app.get('/api/assets/unique', async (req, res) => {
     if (authority_serial) {
       request.input('authority_serial', sql.Int, parseInt(authority_serial, 10));
       filters.push('authority_serial = @authority_serial');
+    }
+    if (asset_type) {
+      request.input('asset_type', sql.NVarChar, asset_type);
+      filters.push('AssetTypeID IN (SELECT AssetTypeID FROM AssetLookup WHERE Asset_Type = @asset_type)');
+    }
+    if (asset_sub_type) {
+      request.input('asset_sub_type', sql.NVarChar, asset_sub_type);
+      filters.push('AssetTypeID IN (SELECT AssetTypeID FROM AssetLookup WHERE Asset_Sub_Type = @asset_sub_type)');
     }
     const filterClause = filters.length ? 'WHERE ' + filters.join(' AND ') : '';
 

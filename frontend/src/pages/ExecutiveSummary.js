@@ -4,6 +4,7 @@ import KPICards from '../components/KPICards';
 import GovernorateChart from '../components/GovernorateChart';
 import AuthorityPieChart from '../components/AuthorityPieChart';
 import SummaryTable from '../components/SummaryTable';
+import DynamicChart from '../components/DynamicChart';
 import { Loader2 } from 'lucide-react';
 
 export default function ExecutiveSummary({ filters }) {
@@ -55,6 +56,7 @@ export default function ExecutiveSummary({ filters }) {
         <AuthorityPieChart data={data?.byAuthority} />
       </div>
       <SummaryTable data={data?.byAuthority} />
+      <DynamicChart />
     </div>
   );
 }

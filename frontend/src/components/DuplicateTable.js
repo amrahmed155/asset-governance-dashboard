@@ -60,13 +60,14 @@ export default function DuplicateTable({ data, loading }) {
               <th className="px-6 py-3 font-semibold text-gray-600">Asset Type</th>
               <th className="px-6 py-3 font-semibold text-gray-600">Sub Type</th>
               <th className="px-6 py-3 font-semibold text-gray-600">Occurrences</th>
+              <th className="px-6 py-3 font-semibold text-gray-600">Certainty</th>
               <th className="px-6 py-3 font-semibold text-gray-600">Found In</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan="7" className="px-6 py-10 text-center text-gray-400">
+                <td colSpan="8" className="px-6 py-10 text-center text-gray-400">
                   <div className="flex items-center justify-center gap-2">
                     <svg className="animate-spin h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -78,7 +79,7 @@ export default function DuplicateTable({ data, loading }) {
               </tr>
             ) : paginated.length === 0 ? (
               <tr>
-                <td colSpan="7" className="px-6 py-10 text-center text-gray-400">
+                <td colSpan="8" className="px-6 py-10 text-center text-gray-400">
                   No duplicate records found
                 </td>
               </tr>
@@ -96,6 +97,25 @@ export default function DuplicateTable({ data, loading }) {
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
                       {row.Occurrences}
                     </span>
+                  </td>
+                  <td className="px-6 py-3">
+                    {(() => {
+                      const pct = row.Certainty || 0;
+                      let color = 'bg-gray-200';
+                      if (pct >= 90) { color = 'bg-red-500'; }
+                      else if (pct >= 75) { color = 'bg-orange-400'; }
+                      else if (pct >= 50) { color = 'bg-yellow-400'; }
+                      return (
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                            <div className={`${color} h-2 rounded-full`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className={`text-xs font-semibold ${pct >= 90 ? 'text-red-600' : pct >= 75 ? 'text-orange-600' : 'text-yellow-600'}`}>
+                            {pct}%
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-3">
                     <div className="flex flex-wrap gap-1">

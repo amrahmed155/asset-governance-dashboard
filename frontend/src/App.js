@@ -16,10 +16,16 @@ export default function App() {
   const {
     governorates,
     authorities,
+    assetTypes,
+    assetSubTypes,
     selectedGov,
     selectedAuth,
+    selectedAssetType,
+    selectedAssetSubType,
     setSelectedGov,
     setSelectedAuth,
+    setSelectedAssetType,
+    setSelectedAssetSubType,
     resetFilters,
     filters,
   } = useFilters();
@@ -43,10 +49,16 @@ export default function App() {
         <FilterBar
           governorates={governorates}
           authorities={authorities}
+          assetTypes={assetTypes}
+          assetSubTypes={assetSubTypes}
           selectedGov={selectedGov}
           selectedAuth={selectedAuth}
+          selectedAssetType={selectedAssetType}
+          selectedAssetSubType={selectedAssetSubType}
           setSelectedGov={setSelectedGov}
           setSelectedAuth={setSelectedAuth}
+          setSelectedAssetType={setSelectedAssetType}
+          setSelectedAssetSubType={setSelectedAssetSubType}
           resetFilters={resetFilters}
         />
 
