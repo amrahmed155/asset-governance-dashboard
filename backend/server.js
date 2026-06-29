@@ -294,33 +294,49 @@ app.get('/api/assets/duplicates', async (req, res) => {
     }
     const filterClause = filters.length ? 'WHERE ' + filters.join(' AND ') : '';
 
+    const nullFilter = 'gov_serial IS NOT NULL AND authority_serial IS NOT NULL AND AssetTypeID IS NOT NULL';
+    const vWhere = filterClause ? filterClause + ' AND ' + nullFilter : 'WHERE ' + nullFilter;
+
     const query = `
       WITH CombinedAssets AS (
         SELECT N'\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u062a\u0635\u0627\u0644\u0627\u062a' AS Source, gov_serial, authority_serial,
                AssetTypeID, CHECKSUM(Asset_Details) AS DescHash,
                CAST(LEFT(ISNULL(Asset_Details, N''), 200) AS NVARCHAR(200)) AS Description
-        FROM Asset_Valuations ${filterClause}
+        FROM Asset_Valuations ${vWhere}
         UNION ALL
         SELECT N'\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u0645\u0627\u0646\u0629 \u0627\u0644\u0641\u0646\u064a\u0629', gov_serial, authority_serial,
                AssetTypeID, CHECKSUM(Asset_Description),
                CAST(LEFT(ISNULL(Asset_Description, N''), 200) AS NVARCHAR(200))
-        FROM Assets_col_unit ${filterClause}
+        FROM Assets_col_unit ${vWhere}
         UNION ALL
         SELECT N'\u0628\u064a\u0627\u0646\u0627\u062a \u062e\u0631\u064a\u0637\u0629 \u062a\u0641\u0627\u0639\u0644\u064a\u0629', gov_serial, authority_serial,
                AssetTypeID, CHECKSUM(Landmark_Name),
                CAST(LEFT(ISNULL(Landmark_Name, N''), 200) AS NVARCHAR(200))
-        FROM interactiveMapData ${filterClause}
+        FROM interactiveMapData ${vWhere}
       ),
       Grouped AS (
         SELECT
           DescHash, gov_serial, authority_serial, AssetTypeID,
           MIN(Description) AS Description,
           COUNT(*) AS Occurrences,
-          COUNT(DISTINCT Source) AS SourceCount,
-          STRING_AGG(CAST(Source AS NVARCHAR(MAX)), N' + ') AS FoundIn
+          COUNT(DISTINCT Source) AS SourceCount
         FROM CombinedAssets
         GROUP BY DescHash, gov_serial, authority_serial, AssetTypeID
         HAVING COUNT(DISTINCT Source) > 1
+      ),
+      DistinctSources AS (
+        SELECT DISTINCT ca.DescHash, ca.gov_serial, ca.authority_serial, ca.AssetTypeID, ca.Source
+        FROM CombinedAssets ca
+        INNER JOIN Grouped gr ON ca.DescHash = gr.DescHash
+          AND ca.gov_serial = gr.gov_serial
+          AND ca.authority_serial = gr.authority_serial
+          AND ca.AssetTypeID = gr.AssetTypeID
+      ),
+      SourceAgg AS (
+        SELECT DescHash, gov_serial, authority_serial, AssetTypeID,
+               STRING_AGG(CAST(Source AS NVARCHAR(MAX)), N' + ') AS FoundIn
+        FROM DistinctSources
+        GROUP BY DescHash, gov_serial, authority_serial, AssetTypeID
       )
       SELECT TOP 500
         gr.Description,
@@ -329,7 +345,7 @@ app.get('/api/assets/duplicates', async (req, res) => {
         lk.Asset_Type,
         lk.Asset_Sub_Type,
         gr.Occurrences,
-        gr.FoundIn,
+        sa.FoundIn,
         CASE
           WHEN gr.SourceCount = 3 THEN 100
           WHEN gr.SourceCount = 2 THEN
@@ -340,6 +356,10 @@ app.get('/api/assets/duplicates', async (req, res) => {
           ELSE 50
         END AS Certainty
       FROM Grouped gr
+      JOIN SourceAgg sa ON gr.DescHash = sa.DescHash
+        AND gr.gov_serial = sa.gov_serial
+        AND gr.authority_serial = sa.authority_serial
+        AND gr.AssetTypeID = sa.AssetTypeID
       JOIN Governorates_Lookup g ON gr.gov_serial = g.Gov_ID
       JOIN Authorities_Lookup al ON gr.authority_serial = al.AuthorityCode
       JOIN AssetLookup lk ON gr.AssetTypeID = lk.AssetTypeID
@@ -377,23 +397,25 @@ app.get('/api/assets/unique', async (req, res) => {
       filters.push('AssetTypeID IN (SELECT AssetTypeID FROM AssetLookup WHERE Asset_Sub_Type = @asset_sub_type)');
     }
     const filterClause = filters.length ? 'WHERE ' + filters.join(' AND ') : '';
+    const nullFilter2 = 'gov_serial IS NOT NULL AND authority_serial IS NOT NULL AND AssetTypeID IS NOT NULL';
+    const uWhere = filterClause ? filterClause + ' AND ' + nullFilter2 : 'WHERE ' + nullFilter2;
 
     const query = `
       WITH CombinedAssets AS (
         SELECT N'\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u062a\u0635\u0627\u0644\u0627\u062a' AS Source, gov_serial, authority_serial,
                AssetTypeID, CHECKSUM(Asset_Details) AS DescHash,
                CAST(LEFT(ISNULL(Asset_Details, N''), 200) AS NVARCHAR(200)) AS Description
-        FROM Asset_Valuations ${filterClause}
+        FROM Asset_Valuations ${uWhere}
         UNION ALL
         SELECT N'\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0627\u0645\u0627\u0646\u0629 \u0627\u0644\u0641\u0646\u064a\u0629', gov_serial, authority_serial,
                AssetTypeID, CHECKSUM(Asset_Description),
                CAST(LEFT(ISNULL(Asset_Description, N''), 200) AS NVARCHAR(200))
-        FROM Assets_col_unit ${filterClause}
+        FROM Assets_col_unit ${uWhere}
         UNION ALL
         SELECT N'\u0628\u064a\u0627\u0646\u0627\u062a \u062e\u0631\u064a\u0637\u0629 \u062a\u0641\u0627\u0639\u0644\u064a\u0629', gov_serial, authority_serial,
                AssetTypeID, CHECKSUM(Landmark_Name),
                CAST(LEFT(ISNULL(Landmark_Name, N''), 200) AS NVARCHAR(200))
-        FROM interactiveMapData ${filterClause}
+        FROM interactiveMapData ${uWhere}
       ),
       Grouped AS (
         SELECT
